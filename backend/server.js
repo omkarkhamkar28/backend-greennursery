@@ -27,7 +27,7 @@ function main() {
   app.use(
     cors({
       origin: "http://localhost:8080",
-      // origin: "https://techready-web.netlify.app",
+      origin: "https://green-nursery.netlify.app/",
       credentials: true,
     })
   );
@@ -69,3 +69,4 @@ function main() {
 }
 
 main();
+
