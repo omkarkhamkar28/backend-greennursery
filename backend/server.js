@@ -25,12 +25,12 @@ function main() {
 
   //provide middle wares
   app.use(
-    cors({
-      origin: "http://localhost:8080",
-      origin: "https://green-nursery.netlify.app/",
-      credentials: true,
-    })
+    cors({ })
   );
+  // origin: "http://localhost:8080",
+      // origin: "https://green-nursery.netlify.app/",
+      // credentials: true,
+   
   app.use(express.json());
   app.use(morgan('dev'));
   app.use("/upload", express.static(path.join(__dirname, "upload")));  // Correct Static Path
@@ -69,4 +69,5 @@ function main() {
 }
 
 main();
+
 
