@@ -1,95 +1,82 @@
-const purchaseCourseModel = require('../models/purchaseProductModel');
- const notificationModel = require('../models/notificationModel');
+const purchaseProductModel = require('../models/purchaseProductModel');
+const Notification = require('../models/notificationModel');
+const productsModel = require('../models/productsModel');
 
 const mongoose = require("mongoose");
-const dotenv = require('dotenv');
-const purchaseProductModel = require('../models/purchaseProductModel');
-dotenv.config();
+
 
 //add product purchase
 const purchaseProductsController = async (req, res) => {
     try {
-        const { user_id, product_id,user, name_en, name_mr, type_en, type_mr, quantity, totalPrice, states, paymentStates } = req.body;
-        const startDate = new Date(req.body.startDate);
+        const { user_id, product_id, user, name_en, name_mr, type_en, type_mr, quantity, totalPrice, states, paymentStates } = req.body;
 
-        // Save purchase details in database
-        const productsPurchase = await new purchaseCourseModel({
-            user_id, 
-            product_id,
-            user,
-            name_en,
-            name_mr,
-            type_en,
-            type_mr,
-            quantity,
-            totalPrice,
-            states,
-            paymentStates
-        }).save();
+        const product = await productsModel.findById(product_id);
+        if (!product) return res.status(404).send({ success: false, message: "Product not found" });
 
-    // const productsPurchase3 = await new notificationModel({
-        //     name_en,
-        //     name_mr,
-        //     type_en,
-        //     type_mr,
-        //     startDate,
-        //     states,
-        //     firstWater: fwater,
-        //     secondWater: swater,
-        //     thirdWater: twater,
-        //     fourthWater: fowater,
-        //     fifthhWater: fiwater
-        // }).save();
+        if (Number(quantity) > Number(product.stock)) return res.status(400).send({ success: false, message: "Not enough stock" });
 
-        const fwater = new Date(startDate.getTime() + 1000 * 60 * 60 * 24 * 7);
-        const swater = new Date(startDate.getTime() + 1000 * 60 * 60 * 24 * 15);
-        const twater = new Date(startDate.getTime() + 1000 * 60 * 60 * 24 * 30);
-        const fowater = new Date(startDate.getTime() + 1000 * 60 * 60 * 24 * 50);
-        const fiwater = new Date(startDate.getTime() + 1000 * 60 * 60 * 24 * 75);
+        // Stock update
+        product.stock = Number(product.stock) - Number(quantity);
+        await product.save();
+
+        // Purchase save
+        const productsPurchase = await purchaseProductModel.create({ user_id, product_id, user, name_en, name_mr, type_en, type_mr, quantity, totalPrice, states, paymentStates });
+
+        // Create notifications based on product schedule
+        const purchaseDate = new Date();
+        const notifications = product.schedule.map(sch => ({
+            day: sch.day,
+            message: sch.message,
+            notifyDate: new Date(purchaseDate.getTime() + sch.day * 24 * 60 * 60 * 1000)
+        }));
+
+        await Notification.create({
+            user: user_id,
+            product: product_id,
+            schedule: notifications
+        });
 
         res.status(201).send({
             success: true,
-            message: "Purchase product Successfully",
+            message: "Product purchased & notifications created",
             productsPurchase,
-            // productsPurchase2,
-            // productsPurchase3
+            remainingStock: product.stock
         });
 
-        if (!productsPurchase ) { //&& !productsPurchase2 && !productsPurchase3
-            return res.status(404).send({
-                success: false,
-                message: "User not found",
-            });
-        }
-
-    }
-    catch (err) {
+    } catch (err) {
         console.log(err);
-        res.status(500).send({
-            success: false,
-            message: 'Error in purchase course',
-            err
-        })
+        res.status(500).send({ success: false, message: 'Error in purchasing', err });
     }
-}
+};
 
 //single user all orders  
 const getSingleuserOrdersDetails = async (req, res) => {
     try {
-        const id = req.params.id;
-        const orders = await purchaseProductModel.find({ id });
+        const { userId } = req.params; // URL मधून userId घेतला
+
+        // user_id नुसार orders fetch करा
+        const orders = await productsModel.find({ user_id: userId })
+            .sort({ purchaseDate: -1 }); // latest first
+
+        if (!orders || orders.length === 0) {
+            return res.status(200).send({
+                success: true,
+                message: "No orders found for this user",
+                orders: []
+            });
+        }
+
         res.status(200).send({
             success: true,
-            message: "Single user Order Details ",
+            message: "User orders fetched successfully",
             orders
         });
-    }
-    catch (error) {
-        console.log(error);
+    } catch (err) {
+        console.error(err);
         res.status(500).send({
             success: false,
-            message: "Error While Geting all order detail",
-            error,
+            message: "Error fetching user orders",
+            err
         });
     }
 };
@@ -117,7 +104,7 @@ const getAllOrdersDetails = async (req, res) => {
 //all Orders Details
 const getSingleOrdersDetails = async (req, res) => {
     try {
-         const order = await purchaseProductModel.findById(req.params.id);
+        const order = await purchaseProductModel.findById(req.params.id);
         res.status(200).send({
             success: true,
             message: "Single Order Details ",
@@ -134,74 +121,102 @@ const getSingleOrdersDetails = async (req, res) => {
     }
 };
 
-//delete product purchase
+// Delete product purchase & notifications
 const deleteProductPurchaseController = async (req, res) => {
     try {
         const { id } = req.params;
-        console.log("Deleting product purchase with ID:", id); // Debugging
 
-        const user = await purchaseProductModel.findById(id);
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: "product puchase not found",
-            });
+        // 1️⃣ Find the purchase
+        const purchase = await purchaseProductModel.findById(id);
+        if (!purchase) {
+            return res.status(404).json({ success: false, message: "Product purchase not found" });
         }
 
+        // 2️⃣ Fetch the product
+        const product = await productsModel.findById(purchase.product_id);
+        if (!product) {
+            return res.status(404).json({ success: false, message: "Associated product not found" });
+        }
+
+        // 3️⃣ Restore the stock
+        product.stock = Number(product.stock) + Number(purchase.quantity);
+        await product.save();
+
+        // 4️⃣ Delete the purchase record
         await purchaseProductModel.findByIdAndDelete(id);
+
+        // 5️⃣ Delete related notifications
+        await Notification.deleteMany({ user: purchase.user_id, product: purchase.product_id });
 
         res.status(200).json({
             success: true,
-            message: "product purchase deleted successfully",
+            message: "Product purchase cancelled, stock restored & notifications deleted",
+            restoredStock: product.stock
         });
     } catch (err) {
-        console.error("Error deleting product:", err);
-        res.status(500).json({
-            success: false,
-            message: "Error deleting product",
-            error: err.message,
-        });
+        console.error("Error deleting product purchase:", err);
+        res.status(500).json({ success: false, message: "Error cancelling product purchase", error: err.message });
     }
 };
 
-// update product
+// Update product purchase & notifications
 const updateProductPurchaseController = async (req, res) => {
     try {
+        const { quantity, totalPrice, states, paymentStates, purchaseDate } = req.body;
 
-        const {   quantity, totalPrice, states, paymentStates,purchaseDate } = req.body;
-        const startDate = new Date(req.body.startDate);
+        // 1️⃣ Find purchase order
+        const purchase = await purchaseProductModel.findById(req.params.id);
+        if (!purchase) return res.status(404).send({ message: "Order not found" });
 
-        // Find product by ID
-        const product = await purchaseCourseModel.findById(req.params.id);
+        // 2️⃣ Find the related product
+        const product = await productsModel.findById(purchase.product_id);
+        if (!product) return res.status(404).send({ message: "Associated product not found" });
 
-        if (!product) {
-            return res.status(404).send({ message: "Order not found" });
-        }
+        // 3️⃣ Adjust stock
+        const oldQuantity = Number(purchase.quantity);
+        const newQuantity = Number(quantity || oldQuantity);
+        const diff = newQuantity - oldQuantity; // positive = increase, negative = decrease
+        product.stock = Number(product.stock) - diff;
+        if (product.stock < 0) return res.status(400).send({ success: false, message: "Not enough stock available" });
+        await product.save();
 
-        const updatedUser = await purchaseCourseModel.findByIdAndUpdate(
+        // 4️⃣ Update purchase
+        const updatedPurchase = await purchaseProductModel.findByIdAndUpdate(
             req.params.id,
-            { 
-                quantity: quantity || product.quantity,
-                totalPrice: totalPrice || product.totalPrice,
-                states: states || product.states,
-                paymentStates: paymentStates || product.paymentStates,
-                purchaseDate: purchaseDate || product.purchaseDate
+            {
+                quantity: newQuantity,
+                totalPrice: totalPrice || purchase.totalPrice,
+                states: states || purchase.states,
+                paymentStates: paymentStates || purchase.paymentStates,
+                purchaseDate: purchaseDate || purchase.purchaseDate
             },
             { new: true }
         );
 
+        // 5️⃣ Update notifications if purchaseDate changed
+        if (purchaseDate) {
+            const existingNotifications = await Notification.findOne({ user: purchase.user_id, product: purchase.product_id });
+            if (existingNotifications) {
+                const newStartDate = new Date(purchaseDate);
+                const updatedSchedule = product.schedule.map(sch => ({
+                    day: sch.day,
+                    message: sch.message,
+                    notifyDate: new Date(newStartDate.getTime() + sch.day * 24 * 60 * 60 * 1000)
+                }));
+                existingNotifications.schedule = updatedSchedule;
+                await existingNotifications.save();
+            }
+        }
+
         res.status(200).send({
             success: true,
-            message: "Order Updated Successfully",
-            updatedUser,
+            message: "Order & notifications updated successfully",
+            updatedPurchase
         });
+
     } catch (err) {
-        console.log("Error in Product purchase:", err);
-        res.status(400).send({
-            success: false,
-            message: "Error While Updating Product purchase",
-            error: err.message,
-        });
+        console.log("Error updating product purchase:", err);
+        res.status(500).send({ success: false, message: "Error while updating order", error: err.message });
     }
 };
 

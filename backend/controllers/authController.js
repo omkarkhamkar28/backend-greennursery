@@ -279,7 +279,6 @@ const getSingleUser = async (req, res) => {
 };
 
 
-
 //admin delete account
 const deleteUserController = async (req, res) => {
   try {
@@ -310,15 +309,149 @@ const deleteUserController = async (req, res) => {
   }
 };
 
+// Like a product
+const addLikeProductController = async (req, res) => {
+  try {
+    const { userId, productId } = req.body;
+
+    // Check user
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).send({ success: false, message: "User not found" });
+    }
+
+    // Already liked?
+    if (user.likedProducts.includes(productId)) {
+      return res.status(400).send({ success: false, message: "Product already liked" });
+    }
+
+    // Push product
+    user.likedProducts.push(productId);
+    await user.save();
+
+    res.status(200).send({
+      success: true,
+      message: "Product liked successfully",
+      likedProducts: user.likedProducts
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: "Error while liking product", err });
+  }
+};
+
+// Remove Like Product
+const removeLikeProductController = async (req, res) => {
+  try {
+    const { userId, productId } = req.body;
+
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).send({ success: false, message: "User not found" });
+    }
+
+    if (!user.likedProducts.includes(productId)) {
+      return res.status(400).send({ success: false, message: "Product not found in liked list" });
+    }
+
+    // filter  
+    user.likedProducts = user.likedProducts.filter(
+      (id) => id.toString() !== productId.toString()
+    );
+
+    await user.save();
+
+    res.status(200).send({
+      success: true,
+      message: "Product unliked successfully",
+      likedProducts: user.likedProducts,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({
+      success: false,
+      message: "Error while unliking product",
+      err,
+    });
+  }
+};
+
+// Collect / Add to wishlist
+const addCollectProductController = async (req, res) => {
+  try {
+    const { userId, productId } = req.body;
+
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).send({ success: false, message: "User not found" });
+    }
+
+    if (user.collectedProducts.includes(productId)) {
+      return res.status(400).send({ success: false, message: "Product already in collection" });
+    }
+
+    user.collectedProducts.push(productId);
+    await user.save();
+
+    res.status(200).send({
+      success: true,
+      message: "Product added to collection successfully",
+      collectedProducts: user.collectedProducts
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ success: false, message: "Error while collecting product", err });
+  }
+};
+
+// Remove Collect Product
+const removeCollectProductController = async (req, res) => {
+  try {
+    const { userId, productId } = req.body;
+
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).send({ success: false, message: "User not found" });
+    }
+
+    if (!user.collectedProducts.includes(productId)) {
+      return res.status(400).send({ success: false, message: "Product not found in collection" });
+    }
+
+    user.collectedProducts = user.collectedProducts.filter(
+      (id) => id.toString() !== productId.toString()
+    );
+
+    await user.save();
+
+    res.status(200).send({
+      success: true,
+      message: "Product removed from collection successfully",
+      collectedProducts: user.collectedProducts,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({
+      success: false,
+      message: "Error while removing product from collection",
+      err,
+    });
+  }
+};
+
 
 module.exports = {
   registerController,
   loginController,
   forgotPasswordController,
+  addLikeProductController,
+  addCollectProductController,
   testController,
   updateProfileController,
   getAllUsers,
   deleteUserController,
   getSingleUser,
   updateProfileController,
+  removeLikeProductController,
+  removeCollectProductController
 };
