@@ -45,7 +45,7 @@ function main() {
 
 
   app.get("/", (req, res) =>
-    res.send(`Welcome to omiii`)
+    res.send(`Welcome to Nursery Project`)
   );
 
   //routes
@@ -72,3 +72,4 @@ function main() {
 }
 
 main();
+
