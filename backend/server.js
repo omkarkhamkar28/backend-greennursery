@@ -13,6 +13,9 @@ function main() {
   let productRoute = require('./routes/productRoute.js')
   let purchaseProductsRoute = require('./routes/purchaseProductsRoute.js')
   let feedbackRoute = require('./routes/feedbackRoute.js')
+  let commentRoute = require('./routes/commentRoute.js')
+  let soilTestingRoute = require('./routes/soilTestingRoute.js')
+  // let notificationRoute = require('./routes/notificationRoute,js')
 
   //database connection
   db_con();
@@ -27,10 +30,6 @@ function main() {
   app.use(
     cors({ })
   );
-  // origin: "http://localhost:8080",
-      // origin: "https://green-nursery.netlify.app/",
-      // credentials: true,
-   
   app.use(express.json());
   app.use(morgan('dev'));
   app.use("/upload", express.static(path.join(__dirname, "upload")));  // Correct Static Path
@@ -44,6 +43,7 @@ function main() {
     next();
   });
 
+
   app.get("/", (req, res) =>
     res.send(`Welcome to omiii`)
   );
@@ -53,6 +53,9 @@ function main() {
   app.use('/product', productRoute);
   app.use('/purchase', purchaseProductsRoute);
   app.use('/feedback', feedbackRoute);
+  app.use('/comment', commentRoute);
+  app.use('/soil-testing', soilTestingRoute);
+  // app.use('/notification', notificationRoute);
 
 
   app.get("*", (req, res) =>
@@ -69,5 +72,3 @@ function main() {
 }
 
 main();
-
-
