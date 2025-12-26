@@ -1,76 +1,68 @@
-//add a row into table test of mysql database nodedb with express and bootstarp
-function main() {
-  let express = require("express");
-  let app = express();
-  let morgan = require("morgan");
-  let db_con = require("./config/db.js");
-  const cors = require("cors");
-  const path = require('path');
-  const mongoose = require("mongoose");
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import path from "path";
+import morgan from "morgan";
 
-  //all routes
-  let authRoutes = require('./routes/authRoute.js')
-  let productRoute = require('./routes/productRoute.js')
-  let purchaseProductsRoute = require('./routes/purchaseProductsRoute.js')
-  let feedbackRoute = require('./routes/feedbackRoute.js')
-  let commentRoute = require('./routes/commentRoute.js')
-  let soilTestingRoute = require('./routes/soilTestingRoute.js')
-  // let notificationRoute = require('./routes/notificationRoute,js')
+import db_con from "./config/db.js";
 
-  //database connection
-  db_con();
+import authRoutes from "./routes/authRoute.js";
+import productRoute from "./routes/productRoute.js";
+import purchaseProductsRoute from "./routes/purchaseProductsRoute.js";
+import feedbackRoute from "./routes/feedbackRoute.js";
+import commentRoute from "./routes/commentRoute.js";
+import soilTestingRoute from "./routes/soilTestingRoute.js";
 
-  //dotenv 
-  let dotenv = require("dotenv");
-  dotenv.config();
+dotenv.config();
+db_con();
 
-  let port = process.env.PORT || 3000;
+const app = express();
 
-  //provide middle wares
- app.use(cors({
+/* ================= MIDDLEWARE ================= */
+
+app.use(express.json());
+app.use(morgan("dev"));
+
+app.use(cors({
   origin: [
     "http://localhost:8080",
     "http://localhost:3000",
     "https://green-nursery.netlify.app"
   ],
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true
 }));
-  
-  app.use(express.json());
-  app.use(morgan('dev'));
-  app.use("/upload", express.static(path.join(__dirname, "upload")));  // Correct Static Path
-  app.use("/uploads", express.static(path.join(__dirname, "uploads")));  // Correct Static Path
-  app.use("/uploadVideos", express.static(path.join(__dirname, "uploadVideos")));  // Correct Static Path
 
-  app.use((req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    next();
+// 🔥 VERY IMPORTANT FOR PREFLIGHT
+app.options("*", cors());
+
+/* ================= STATIC ================= */
+
+app.use("/upload", express.static("upload"));
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/uploadVideos", express.static(path.join(process.cwd(), "uploadVideos")));
+
+/* ================= ROUTES ================= */
+
+app.get("/", (req, res) => {
+  res.send("Welcome to omiii");
+});
+
+app.use("/auth", authRoutes);
+app.use("/product", productRoute);
+app.use("/purchase", purchaseProductsRoute);
+app.use("/feedback", feedbackRoute);
+app.use("/comment", commentRoute);
+app.use("/soil-testing", soilTestingRoute);
+
+/* ================= EXPORT FOR VERCEL ================= */
+
+export default app;
+
+/* ================= LOCAL ONLY ================= */
+if (process.env.NODE_ENV !== "production") {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
   });
-
-
-  app.get("/", (req, res) =>
-    res.send(`Welcome to Nursery Project`)
-  );
-
-  //routes
-  app.use('/auth', authRoutes);
-  app.use('/product', productRoute);
-  app.use('/purchase', purchaseProductsRoute);
-  app.use('/feedback', feedbackRoute);
-  app.use('/comment', commentRoute);
-  app.use('/soil-testing', soilTestingRoute);
-  // app.use('/notification', notificationRoute);
-
-
-  app.get("*", (req, res) =>
-    res.send("Erorr : 404")
-  );
 }
-
-main();
-
-
-
