@@ -68,16 +68,9 @@ function main() {
   app.get("*", (req, res) =>
     res.send("Erorr : 404")
   );
-
-
-  app.listen(port, function () {
-    console.log(
-      "Server is ready, please open your browser at http://localhost:%s",
-      port
-    );
-  });
 }
 
 main();
+
 
 
