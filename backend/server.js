@@ -27,9 +27,16 @@ function main() {
   let port = process.env.PORT || 3000;
 
   //provide middle wares
-  app.use(
-    cors({ })
-  );
+ app.use(cors({
+  origin: [
+    "http://localhost:8080",
+    "http://localhost:3000",
+    "https://green-nursery.netlify.app"
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+  
   app.use(express.json());
   app.use(morgan('dev'));
   app.use("/upload", express.static(path.join(__dirname, "upload")));  // Correct Static Path
@@ -72,4 +79,5 @@ function main() {
 }
 
 main();
+
 
