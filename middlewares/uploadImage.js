@@ -1,0 +1,14 @@
+const multer = require("multer");
+
+// PRODUCT images still local
+const productStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "./upload"),
+  filename: (req, file, cb) => cb(null, Date.now() + "-" + file.originalname),
+});
+const upload = multer({ storage: productStorage });
+
+// PROFILE images -> memory storage for Cloudinary
+const profileStorage = multer.memoryStorage();
+const ProfileImageUpload = multer({ storage: profileStorage });
+
+module.exports = { upload, ProfileImageUpload };
