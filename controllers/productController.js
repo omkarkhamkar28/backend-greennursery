@@ -1,260 +1,249 @@
+const purchaseProductModel = require('../models/purchaseProductModel');
+const Notification = require('../models/notificationModel');
 const productsModel = require('../models/productsModel');
-const commentsModel = require('../models/commentsModel');
-const replyModel = require('../models/replyModel');
+
 const mongoose = require("mongoose");
-const dotenv = require('dotenv');
-dotenv.config();
-const cloudinary = require("../config/cloudinary.js");
 
+const purchaseProductsController = async (req, res) => {
+    try {
+        const { user_id, product_id, user, name_en, name_mr, type_en, type_mr, quantity, totalPrice, states, paymentStates } = req.body;
 
-const addProductController = async (req, res) => {
+        const product = await productsModel.findById(product_id);
+        if (!product) return res.status(404).send({ success: false, message: "Product not found" });
+
+        if (Number(quantity) > Number(product.stock)) return res.status(400).send({ success: false, message: "Not enough stock" });
+
+         product.stock = Number(product.stock) - Number(quantity);
+        await product.save();
+
+        // Purchase save
+        const productsPurchase = await purchaseProductModel.create({ user_id, product_id, user, name_en, name_mr, type_en, type_mr, quantity, totalPrice, states, paymentStates });
+
+        res.status(201).send({
+            success: true,
+            message: "Product purchased & notifications created",
+            productsPurchase,
+            remainingStock: product.stock
+        });
+
+    } catch (err) {
+        console.log(err);
+        res.status(500).send({ success: false, message: 'Error in purchasing', err });
+    }
+};
+
+ const getSingleuserOrdersDetails = async (req, res) => {
   try {
-    const {
-      name_en,
-      name_mr,
-      type_en,
-      type_mr,
-      description_en,
-      description_mr,
-      rate,
-      stock,
-    } = req.body;
+    const orders = await purchaseProductModel.find({
+      user_id: req.params.id    });
 
-    let schedule = [];
-    if (req.body.schedule) {
-      schedule = JSON.parse(req.body.schedule);
-    }
-
-    if (
-      !name_en ||
-      !name_mr ||
-      !type_en ||
-      !type_mr ||
-      !description_en ||
-      !description_mr ||
-      !rate ||
-      !stock
-    ) {
-      return res.status(400).send({
-        success: false,
-        message: "All fields are required",
-      });
-    }
-
-    const existing = await productsModel.findOne({
-      $or: [{ name_en }, { name_mr }],
-    });
-
-    if (existing) {
-      return res.status(200).send({
-        success: false,
-        message: "Product already exists",
-      });
-    }
-
-    // ✅ Upload image to Cloudinary if file exists
-    let photoUrl = null;
-    if (req.file) {
-      const result = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { folder: "productImages" },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        stream.end(req.file.buffer);
-      });
-      photoUrl = result.secure_url;
-    }
-
-    const product = new productsModel({
-      name_en,
-      name_mr,
-      type_en,
-      type_mr,
-      description_en,
-      description_mr,
-      rate,
-      stock,
-      schedule,
-      photo: photoUrl,
-    });
-
-    await product.save();
-
-    res.status(201).send({
+    return res.status(200).send({
       success: true,
-      message: "Product added successfully",
-      product,
+      message: "User orders fetched successfully",
+      orders
     });
+
   } catch (err) {
-    console.log("Error in addProductController:", err);
+    console.error(err);
     res.status(500).send({
       success: false,
-      message: "Error in adding product",
-      error: err.message,
+      message: "Error fetching user orders",
+      err
     });
   }
 };
 
-const getAllProducts = async (req, res) => {
+
+//all Orders Details
+const getAllOrdersDetails = async (req, res) => {
     try {
-        const products = await productsModel.find({});
+        const orders = await purchaseProductModel.find({});
         res.status(200).send({
             success: true,
-            message: "All products ",
-            products
+            message: "All Order Details ",
+            orders
         });
     }
     catch (error) {
         console.log(error);
         res.status(500).send({
             success: false,
-            message: "Error While Geting products",
+            message: "Error While Geting all order detail",
             error,
         });
     }
 };
 
-const updateProductController = async (req, res) => {
+//all Orders Details
+const getSingleOrdersDetails = async (req, res) => {
+    try {
+        const order = await purchaseProductModel.findById(req.params.id);
+        res.status(200).send({
+            success: true,
+            message: "Single Order Details ",
+            order
+        });
+    }
+    catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: "Error While Geting all order detail",
+            error,
+        });
+    }
+};
+
+const deleteProductPurchaseController = async (req, res) => {
+    try {
+        const order = await purchaseProductModel.findById(req.params.id);
+        if (!order)
+            return res.status(404).send({ success: false, message: "Order not found" });
+
+        // Delete order
+        await purchaseProductModel.findByIdAndDelete(req.params.id);
+
+        res.status(200).json({
+            success: true,
+            message: "Order Delete",
+         });
+    } catch (err) {
+        console.error("Error deleting product purchase:", err);
+        res.status(500).json({ success: false, message: "Error cancelling product purchase", error: err.message });
+    }
+};
+
+const updateProductPurchaseController = async (req, res) => {
   try {
-    const {
-      name_en,
-      name_mr,
-      description_en,
-      description_mr,
-      type_en,
-      type_mr,
-      rate,
-      stock,
-      schedule
-    } = req.body;
+    const { quantity, states, paymentStates } = req.body;
 
-    const product = await productsModel.findById(req.params.id);
-    if (!product) {
-      return res.status(404).send({
-        success: false,
-        message: "Product not found",
-      });
+    const order = await purchaseProductModel.findById(req.params.id);
+    if (!order)
+      return res.status(404).send({ success: false, message: "Order not found" });
+
+    const product = await productsModel.findById(order.product_id);
+    if (!product)
+      return res.status(404).send({ success: false, message: "Product not found" });
+
+    const prevQty = Number(order.quantity);
+    const newQty = Number(quantity);
+    let stockAvailable = Number(product.stock);
+
+    const reverseStates = ["Cancelled", "Returned"];
+
+    /* 🔴 Active → Cancelled / Returned */
+    if (
+      reverseStates.includes(states) &&
+      !reverseStates.includes(order.states)
+    ) {
+      product.stock = stockAvailable + prevQty; // ✅ FIX
     }
 
-    // Parse schedule if provided
-    let parsedSchedule = product.schedule;
-    if (schedule) {
-      parsedSchedule = JSON.parse(schedule);
+    /* 🟢 Cancelled / Returned → Active */
+    else if (
+      reverseStates.includes(order.states) &&
+      !reverseStates.includes(states)
+    ) {
+      if (stockAvailable < newQty) {
+        return res.status(400).send({
+          success: false,
+          message: `Not enough stock. Available: ${stockAvailable}`,
+        });
+      }
+      product.stock = stockAvailable - newQty;
     }
 
-    // Upload photo to Cloudinary if provided
-    let photoPath = product.photo; // existing photo
-    if (req.file) {
-      const result = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { folder: "productImages" },
-          (error, result) => {
-            if (error) reject(error);
-            else resolve(result);
-          }
-        );
-        stream.end(req.file.buffer);
-      });
-      photoPath = result.secure_url; // Cloudinary URL
+    /* ✏️ Active → Active quantity update */
+    else if (!reverseStates.includes(states)) {
+      const stockChange = newQty - prevQty;
+
+      if (stockAvailable - stockChange < 0) {
+        return res.status(400).send({
+          success: false,
+          message: `Not enough stock. Available: ${stockAvailable}`,
+        });
+      }
+
+      product.stock = stockAvailable - stockChange;
     }
 
-    const updatedProduct = await productsModel.findByIdAndUpdate(
-      req.params.id,
-      {
-        name_en: name_en || product.name_en,
-        name_mr: name_mr || product.name_mr,
-        description_en: description_en || product.description_en,
-        description_mr: description_mr || product.description_mr,
-        type_en: type_en || product.type_en,
-        type_mr: type_mr || product.type_mr,
-        rate: rate || product.rate,
-        stock: stock || product.stock,
-        schedule: parsedSchedule,
-        photo: photoPath,
-      },
-      { new: true }
-    );
+    await product.save({ validateBeforeSave: false });
+
+    order.quantity = newQty;
+    order.totalPrice = newQty * Number(product.rate);
+    order.states = states || order.states;
+    order.paymentStates = paymentStates || order.paymentStates;
+
+    await order.save();
 
     res.status(200).send({
       success: true,
-      message: "Product Updated Successfully",
-      updatedProduct,
+      message: "Order updated successfully",
+      order,
+      remainingStock: product.stock,
     });
-  } catch (error) {
-    console.log("Error in updateProductController:", error);
-    res.status(400).send({
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({
       success: false,
-      message: "Error While Updating Product",
-      error: error.message,
+      message: "Error updating order",
+      error: err.message,
     });
   }
 };
 
-const getSingleProductController = async (req, res) => {
-    try {
-        const product = await productsModel.findById(req.params.id);
+const returnQuantityAddProductController = async (req, res) => {
+  try {
+    const { quantity } = req.body;
 
-        if (!product) {
-            return res.status(404).send({
-                success: false,
-                message: "Product not found",
-            });
-        }
+    const order = await purchaseProductModel.findById(req.params.id);
+    if (!order)
+      return res.status(404).send({ success: false, message: "Order not found" });
 
-        res.status(200).send({
-            success: true,
-            message: "Single product",
-            product,
-        });
-    }
-    catch (err) {
-        console.log(err);
-        res.status(500).send({
-            success: false,
-            message: "Error in getting single product",
-            error: err.message,
-        });
-    }
-}
+    const product = await productsModel.findById(order.product_id);
+    if (!product)
+      return res.status(404).send({ success: false, message: "Product not found" });
 
-//delete product
-const deleteProductController = async (req, res) => {
-    try {
-        const { id } = req.params;
-        console.log("Deleting product with ID:", id); // Debugging
+    const Qty = Number(quantity); 
+    let stockAvailable = Number(product.stock);
 
-        const product = await productsModel.findById(id);
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: "product not found",
-            });
-        }
+     product.stock = stockAvailable + Qty;
+    await product.save(); // <-- SAVE product after updating stock
 
-        await productsModel.findByIdAndDelete(id);
+    res.status(200).send({
+      success: true,
+      message: "Returned product quantity added to stock successfully",
+      order: {
+        _id: order._id,
+        product_id: product._id,
+        product_name_en: product.name_en,
+        product_name_mr: product.name_mr,
+        quantity: order.quantity,  // original purchased quantity
+        totalPrice: order.totalPrice,
+        states: order.states,
+        paymentStates: order.paymentStates,
+      },
+      remainingStock: product.stock,
+    });
 
-        res.status(200).json({
-            success: true,
-            message: "product deleted successfully",
-        });
-    } catch (err) {
-        console.error("Error deleting product:", err);
-        res.status(500).json({
-            success: false,
-            message: "Error deleting product",
-            error: err.message,
-        });
-    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({
+      success: false,
+      message: "Error updating stock for returned product",
+      error: err.message,
+    });
+  }
 };
 
 
 module.exports = {
-    addProductController,
-    getAllProducts,
-    deleteProductController,
-    getSingleProductController,
-    updateProductController,
+    purchaseProductsController,
+    getAllOrdersDetails,
+    deleteProductPurchaseController,
+    getSingleuserOrdersDetails,
+    updateProductPurchaseController,
+    getSingleOrdersDetails,
+    returnQuantityAddProductController
 };
