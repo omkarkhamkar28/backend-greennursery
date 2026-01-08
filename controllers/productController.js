@@ -2,8 +2,11 @@ const productsModel = require('../models/productsModel');
 const commentsModel = require('../models/commentsModel');
 const replyModel = require('../models/replyModel');
 const mongoose = require("mongoose");
+const dotenv = require('dotenv');
+dotenv.config();
+const cloudinary = require("../config/cloudinary.js");
 
-// add product
+
 const addProductController = async (req, res) => {
   try {
     const {
@@ -17,7 +20,7 @@ const addProductController = async (req, res) => {
       stock,
     } = req.body;
 
-     let schedule = [];
+    let schedule = [];
     if (req.body.schedule) {
       schedule = JSON.parse(req.body.schedule);
     }
@@ -49,6 +52,22 @@ const addProductController = async (req, res) => {
       });
     }
 
+    // ✅ Upload image to Cloudinary if file exists
+    let photoUrl = null;
+    if (req.file) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "productImages" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        stream.end(req.file.buffer);
+      });
+      photoUrl = result.secure_url;
+    }
+
     const product = new productsModel({
       name_en,
       name_mr,
@@ -59,7 +78,7 @@ const addProductController = async (req, res) => {
       rate,
       stock,
       schedule,
-      photo: req.file ? req.file.filename : null, 
+      photo: photoUrl,
     });
 
     await product.save();
@@ -70,16 +89,15 @@ const addProductController = async (req, res) => {
       product,
     });
   } catch (err) {
-    console.log(err);
+    console.log("Error in addProductController:", err);
     res.status(500).send({
       success: false,
       message: "Error in adding product",
-      err,
+      error: err.message,
     });
   }
 };
 
-//all products
 const getAllProducts = async (req, res) => {
     try {
         const products = await productsModel.find({});
@@ -121,15 +139,26 @@ const updateProductController = async (req, res) => {
       });
     }
 
-    // ✅ Parse schedule (string → array)
+    // Parse schedule if provided
     let parsedSchedule = product.schedule;
     if (schedule) {
       parsedSchedule = JSON.parse(schedule);
     }
 
-    let photoPath = product.photo;
+    // Upload photo to Cloudinary if provided
+    let photoPath = product.photo; // existing photo
     if (req.file) {
-      photoPath = req.file.filename;
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "productImages" },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        stream.end(req.file.buffer);
+      });
+      photoPath = result.secure_url; // Cloudinary URL
     }
 
     const updatedProduct = await productsModel.findByIdAndUpdate(
@@ -155,7 +184,7 @@ const updateProductController = async (req, res) => {
       updatedProduct,
     });
   } catch (error) {
-    console.log(error);
+    console.log("Error in updateProductController:", error);
     res.status(400).send({
       success: false,
       message: "Error While Updating Product",
@@ -164,7 +193,6 @@ const updateProductController = async (req, res) => {
   }
 };
 
-// single product
 const getSingleProductController = async (req, res) => {
     try {
         const product = await productsModel.findById(req.params.id);
