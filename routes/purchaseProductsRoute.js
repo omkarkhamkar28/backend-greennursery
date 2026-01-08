@@ -1,10 +1,9 @@
 const express = require('express');
-const { purchaseProductsController, getAllOrdersDetails, deleteProductPurchaseController, getSingleuserOrdersDetails, updateProductPurchaseController, getSingleOrdersDetails } = require('../controllers/productsPurchaseController');
+const { purchaseProductsController, getAllOrdersDetails, deleteProductPurchaseController, getSingleuserOrdersDetails, updateProductPurchaseController, getSingleOrdersDetails, returnQuantityAddProductController } = require('../controllers/productsPurchaseController');
 const { requireSignIn, isAdmin } = require('../middlewares/authMiddlewares');
 
 
 const router = express.Router();
-
 
 router.post('/purchase-product',requireSignIn, purchaseProductsController );
 
@@ -18,8 +17,9 @@ router.delete('/delete-purchase-product/:id',requireSignIn, deleteProductPurchas
 
 router.put('/update-purchase-product/:id', updateProductPurchaseController );
 
- 
-// router.get('/check-access/:course/:name',requireSignIn, checkAccessCourseController);
+router.put('/return-product/:id', returnQuantityAddProductController );
 
+ 
+ 
 
 module.exports = router;
