@@ -13,26 +13,11 @@ const purchaseProductsController = async (req, res) => {
 
         if (Number(quantity) > Number(product.stock)) return res.status(400).send({ success: false, message: "Not enough stock" });
 
-        // Stock update
-        product.stock = Number(product.stock) - Number(quantity);
+         product.stock = Number(product.stock) - Number(quantity);
         await product.save();
 
         // Purchase save
         const productsPurchase = await purchaseProductModel.create({ user_id, product_id, user, name_en, name_mr, type_en, type_mr, quantity, totalPrice, states, paymentStates });
-
-        // Create notifications based on product schedule
-        const purchaseDate = new Date();
-        const notifications = product.schedule.map(sch => ({
-            day: sch.day,
-            message: sch.message,
-            notifyDate: new Date(purchaseDate.getTime() + sch.day * 24 * 60 * 60 * 1000)
-        }));
-
-        await Notification.create({
-            user: user_id,
-            product: product_id,
-            schedule: notifications
-        });
 
         res.status(201).send({
             success: true,
@@ -208,6 +193,50 @@ const updateProductPurchaseController = async (req, res) => {
   }
 };
 
+const returnQuantityAddProductController = async (req, res) => {
+  try {
+    const { quantity } = req.body;
+
+    const order = await purchaseProductModel.findById(req.params.id);
+    if (!order)
+      return res.status(404).send({ success: false, message: "Order not found" });
+
+    const product = await productsModel.findById(order.product_id);
+    if (!product)
+      return res.status(404).send({ success: false, message: "Product not found" });
+
+    const Qty = Number(quantity); 
+    let stockAvailable = Number(product.stock);
+
+     product.stock = stockAvailable + Qty;
+    await product.save(); // <-- SAVE product after updating stock
+
+    res.status(200).send({
+      success: true,
+      message: "Returned product quantity added to stock successfully",
+      order: {
+        _id: order._id,
+        product_id: product._id,
+        product_name_en: product.name_en,
+        product_name_mr: product.name_mr,
+        quantity: order.quantity,  // original purchased quantity
+        totalPrice: order.totalPrice,
+        states: order.states,
+        paymentStates: order.paymentStates,
+      },
+      remainingStock: product.stock,
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({
+      success: false,
+      message: "Error updating stock for returned product",
+      error: err.message,
+    });
+  }
+};
+
 
 module.exports = {
     purchaseProductsController,
@@ -215,5 +244,6 @@ module.exports = {
     deleteProductPurchaseController,
     getSingleuserOrdersDetails,
     updateProductPurchaseController,
-    getSingleOrdersDetails
+    getSingleOrdersDetails,
+    returnQuantityAddProductController
 };
