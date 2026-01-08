@@ -15,9 +15,6 @@ const registerController = async (req, res) => {
     if (!name) {
       return res.send({ message: "Name is Required" });
     }
-    if (!email) {
-      return res.send({ message: "Email is Required" });
-    }
     if (!password) {
       return res.send({ message: "Password is Required" });
     }
@@ -28,19 +25,19 @@ const registerController = async (req, res) => {
       return res.send({ message: "answer is Required" });
     }
 
-    const exisitingUser = await userModel.findOne({ email });
+    const exisitingUser = await userModel.findOne({ phone });
 
     if (exisitingUser) {
       return res.status(200).send({
         success: false,
-        message: "Already Register please login",
+        message: "Already Register please ",
       });
     }
     const hashedPassword = await hashPassword(password);
     const user = await new userModel({
       name,
-      address,
-      email,
+      // address,
+      // email,
       phone,
       password: hashedPassword,
       answer
@@ -82,42 +79,46 @@ const registerController = async (req, res) => {
 
 const loginController = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { phone, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(404).send({
+    // Check if phone or password missing
+    if (!phone || !password) {
+      return res.status(400).send({
         success: false,
-        message: 'Invalid email or password'
-      })
-    }
-
-    const user = await userModel.findOne({ email });
-    if (!user) {
-      return res.status(404).send({
-        success: false,
-        message: 'User not found'
-      })
-    }
-    const match = await comparePassword(password, user.password);
-    if (!match) {
-      return res.status(404).send({
-        success: false,
-        message: 'Password is invalid'
+        message: 'कृपया मोबाईल नंबर आणि पासवर्ड भरा'
       });
     }
 
+    // Find user by phone
+    const user = await userModel.findOne({ phone });
+    if (!user) {
+      return res.status(404).send({
+        success: false,
+        message: 'मोबाईल नंबर नोंदलेला नाही'
+      });
+    }
+
+    // Compare password
+    const match = await comparePassword(password, user.password);
+    if (!match) {
+      return res.status(401).send({
+        success: false,
+        message: 'पासवर्ड चुकीचा आहे'
+      });
+    }
+
+    // Generate token
     const token = await JWT.sign({ _id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
-    console.log(token);
 
+    // Send success response
     res.status(200).send({
       success: true,
-      message: 'Login successful',
+      message: 'लॉगिन यशस्वी!',
       user: {
         _id: user._id,
         name: user.name,
-        email: user.email,
         phone: user.phone,
         photo: user.photo,
         address: user.address,
@@ -128,14 +129,11 @@ const loginController = async (req, res) => {
       },
       token,
     });
-
-
-  }
-  catch (err) {
+  } catch (err) {
     console.log(err);
     res.status(500).send({
       success: false,
-      message: 'Error in login',
+      message: 'लॉगिन करताना काहीतरी चूक झाली. कृपया पुन्हा प्रयत्न करा',
       err
     });
   }
@@ -143,9 +141,9 @@ const loginController = async (req, res) => {
 
 const forgotPasswordController = async (req, res) => {
   try {
-    const { email, answer, newPassword } = req.body;
-    if (!email) {
-      res.status(400).send({ message: "Email is required" });
+    const { phone, answer, newPassword } = req.body;
+    if (!phone) {
+      res.status(400).send({ message: "phone is required" });
     }
     if (!answer) {
       res.status(400).send({ message: "answer is required" });
@@ -153,11 +151,11 @@ const forgotPasswordController = async (req, res) => {
     if (!newPassword) {
       res.status(400).send({ message: "New Password is required" });
     }
-    const user = await userModel.findOne({ email, answer });
+    const user = await userModel.findOne({ phone, answer });
     if (!user) {
       return res.status(404).send({
         success: false,
-        message: "Wrong Email Or Answer",
+        message: "Wrong phone Or Answer",
       });
     }
     const hashed = await hashPassword(newPassword);
@@ -220,63 +218,9 @@ const verifyPasswordController = async (req, res) => {
   }
 };
 
-
-const updatePhotoController = async (req, res) => {
-  try {
-    const userId = req.params.id;
-
-    if (!req.file) {
-      return res.status(400).send({
-        success: false,
-        message: "Photo not provided",
-      });
-    }
-
-    // 1️⃣ user fetch
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).send({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    // 2️⃣ old photo delete
-    if (user.photo) {
-      const oldPhotoPath = path.join(
-        __dirname,
-        "../profileImages",
-        user.photo
-      );
-
-      if (fs.existsSync(oldPhotoPath)) {
-        fs.unlinkSync(oldPhotoPath);
-      }
-    }
-
-    // 3️⃣ update DB with new photo
-    user.photo = req.file.filename;
-    await user.save();
-
-    res.status(200).send({
-      success: true,
-      message: "Profile photo updated successfully",
-      user,
-    });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).send({
-      success: false,
-      message: "Error updating profile photo",
-    });
-  }
-};
-
-
 const updateUserController = async (req, res) => {
   try {
-    const { name, password, phone, address } = req.body;
+    const { name, password, phone, address, photo } = req.body;
     const userId = req.params.id;
 
     const user = await userModel.findById(userId);
@@ -287,11 +231,14 @@ const updateUserController = async (req, res) => {
       });
     }
 
-    const updateData = {};
+    let updateData = {};
 
+    // text fields
     if (name) updateData.name = name;
     if (phone) updateData.phone = phone;
     if (address) updateData.address = address;
+
+    // password
     if (password) {
       if (password.length < 6) {
         return res.status(400).send({
@@ -301,8 +248,11 @@ const updateUserController = async (req, res) => {
       }
       updateData.password = await hashPassword(password);
     }
+    
+    if (photo === null) {
+      updateData.$unset = { photo: "" };
+    }
 
-    // If a file is uploaded, upload to Cloudinary
     if (req.file) {
       const result = await new Promise((resolve, reject) => {
         const stream = cloudinary.uploader.upload_stream(
@@ -315,16 +265,21 @@ const updateUserController = async (req, res) => {
         stream.end(req.file.buffer);
       });
 
-      updateData.photo = result.secure_url;
+      updateData.$set = { photo: result.secure_url };
     }
 
-    const updatedUser = await userModel.findByIdAndUpdate(userId, updateData, { new: true });
+    const updatedUser = await userModel.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true }
+    );
 
     res.status(200).send({
       success: true,
       message: "User updated successfully",
       updatedUser,
     });
+
   } catch (err) {
     console.log("Error in updateUserController:", err);
     res.status(500).send({
@@ -334,6 +289,7 @@ const updateUserController = async (req, res) => {
     });
   }
 };
+
 
 const testController = (req, res) => {
   try {
