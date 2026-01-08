@@ -8,13 +8,13 @@ const {
 
 } = require('../controllers/productController');
 const { requireSignIn, isAdmin } = require('../middlewares/authMiddlewares');
-const { upload } = require("../middlewares/uploadImage");
+const { ProductImageUpload } = require("../middlewares/uploadProductImage");
 
 //router object 
 const router = express.Router();
 
 //add
-router.post("/add-product", upload.single("image"), addProductController);
+router.post("/add-product", ProductImageUpload.single("image"), addProductController);
 
 //all products
 router.get("/all-products", getAllProducts);
@@ -25,7 +25,7 @@ router.get('/viewproduct/:id', getSingleProductController);
 //edit user
 router.put(
   "/editproduct/:id",
-  upload.single("photo"),
+  ProductImageUpload.single("photo"),
   updateProductController
 );
 
