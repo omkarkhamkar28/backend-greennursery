@@ -47,7 +47,7 @@ router.get("/admin-auth", requireSignIn, isAdmin, (req, res) => {
 });
 
 //all users
-router.get("/all-users", requireSignIn, isAdmin, getAllUsers);
+router.get("/all-users", getAllUsers);
 
 //get single user
 router.get('/viewuser/:id', getSingleUser);
