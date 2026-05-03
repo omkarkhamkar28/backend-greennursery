@@ -15,6 +15,7 @@ function main() {
   let feedbackRoute = require('./routes/feedbackRoute.js')
   let commentRoute = require('./routes/commentRoute.js')
   let soilTestingRoute = require('./routes/soilTestingRoute.js')
+  let msgRoute = require('./routes/msgRoute.js')
   // let notificationRoute = require('./routes/notificationRoute,js')
 
     //dotenv 
@@ -37,12 +38,12 @@ function main() {
   // app.use("/uploads", express.static(path.join(__dirname, "uploads")));  
   // app.use("/uploadVideos", express.static(path.join(__dirname, "uploadVideos"))); 
 
-  app.use((req, res, next) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    next();
-  });
+  // app.use((req, res, next) => {
+  //   res.setHeader("Access-Control-Allow-Origin", "*");
+  //   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+  //   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  //   next();
+  // });
 
 
   app.get("/", (req, res) =>
@@ -56,6 +57,7 @@ function main() {
   app.use('/feedback', feedbackRoute);
   app.use('/comment', commentRoute);
   app.use('/soil-testing', soilTestingRoute);
+  app.use('/chat', msgRoute);
   // app.use('/notification', notificationRoute);
 
 
